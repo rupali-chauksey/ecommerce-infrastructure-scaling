@@ -1,0 +1,17 @@
+# Assignment materials and guides (do not push to GitHub)
+Screenshot/
+*.pdf
+pdf/
+
+# Python / Jupyter artifacts
+.ipynb_checkpoints/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+.DS_Store
