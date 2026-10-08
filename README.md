@@ -1,340 +1,219 @@
 # E-Commerce Infrastructure Scaling Intelligence
 ## Predictive Demand Forecasting & Proactive Capacity Planning for NimbusCart Global
 
-**Student / Author**: Rupali Chauksey  
+**Author / Student**: Rupali Chauksey  
 **Program**: Generative AI with Agentic AI Masters Program (Skillfyme)  
-**Module**: Applied Machine Learning Capstone Deliverable  
-**Client**: NimbusCart Global (Site Reliability Engineering & Infrastructure Analytics Guild)  
-**Repository**: [https://github.com/rupali-chauksey/ecommerce-infrastructure-scaling](https://github.com/rupali-chauksey/ecommerce-infrastructure-scaling)  
+**Module**: Applied Machine Learning Capstone Project  
+**Repository**: [github.com/rupali-chauksey/ecommerce-infrastructure-scaling](https://github.com/rupali-chauksey/ecommerce-infrastructure-scaling)  
 **Primary Deliverable**: [`ecommerce_infrastructure_scaling_analysis.ipynb`](ecommerce_infrastructure_scaling_analysis.ipynb)
 
 ---
 
-## 1. Executive Incident Context & Business Problem
+## 1. Problem Statement & Incident Context
 
-Six weeks ago, **NimbusCart Global**—a fast-growing tier-1 e-commerce enterprise serving customers across North, South, and West geographical regions—suffered a high-severity infrastructure collapse during an unscheduled Flash Sale. 
+Six weeks ago, **NimbusCart Global** experienced a major infrastructure failure during an unscheduled Flash Sale. Active users tripled within 30 minutes, traditional auto-scaling lagged behind demand, response latency crossed the 200ms SLA, and checkout requests stalled. The incident caused **₹40 Lakh in lost GMV** and `#NimbusCartDown` trending on social media.
 
-### What Happened During the Outage?
-1. **Demand Surge**: Concurrent active users tripled (a 300% spike) in under 30 minutes.
-2. **Reactive Lag**: Traditional threshold-based auto-scaling rules had a 5–7 minute provisioning lag (container boot + JVM/Node warm-up time).
-3. **SLA Breach**: API response latency crossed the strict 200ms SLA threshold, surging past 380ms.
-4. **Checkout Throttling**: Microservices choked, database connection pools were exhausted, and payment gateways timed out.
-5. **Business Impact**: **₹40 Lakh in lost Gross Merchandise Value (GMV)** within a single evening, accompanied by `#NimbusCartDown` trending nationwide on social media.
-
-```
-                    ┌─────────────────────────────────────────────────────────┐
-                    │               THE CRITICAL OUTAGE SPIRAL                │
-                    └─────────────────────────────────────────────────────────┘
-   [Flash Sale Spike] ──> [Active Users x3] ──> [Auto-Scaling 7min Lag]
-                                                            │
-                                                            ▼
-   [₹40L Lost GMV] <── [Checkout Throttled] <── [Latency Spikes >200ms]
-```
-
-### The Mandate from the VP of Infrastructure:
+### The Brief from the VP of Infrastructure:
 > *"I don't want another dashboard. I want to know, right now, whether the infrastructure we have will survive the next 15 minutes — and if not, how much lead time we get to scale up before it breaks. Show me the evidence, not a guess."*
 
 ---
 
-## 2. Telemetry Schema & Complete Data Dictionary
+## 2. Dataset Schema & Column Reference
 
-The production telemetry dataset (`data/ecommerce_infrastructure_scaling.csv`) captures **3,023 monitoring snapshots** recorded at continuous **10-minute intervals** across 3 full weeks (July 1 to July 21, 2026).
+The dataset (`data/ecommerce_infrastructure_scaling.csv`) contains **3,023 monitoring snapshots** sampled at continuous **10-minute intervals** across 3 weeks (July 1 to July 21, 2026).
 
-| # | Column Name | Data Type | Physical Unit | Operational Role | Business Description & SRE Meaning |
-| :---: | :--- | :---: | :---: | :---: | :--- |
-| 1 | `timestamp` | `datetime` | `YYYY-MM-DD HH:MM` | Temporal Anchor | Snapshot timestamp at 10-minute intervals covering 21 continuous days. |
-| 2 | `sale_event` | `categorical` | `Normal / Sale / Flash Sale` | Business Context | Commercial operating regime: Baseline Normal (52.9%), Planned Sale (43.2%), Unscheduled Flash Sale (3.9%). |
-| 3 | `region` | `categorical` | `North / South / West` | Spatial Dimension | Geographical infrastructure zone and AWS/GCP availability region handling the load. |
-| 4 | `active_users` | `numeric (float)` | User Count | Demand Signal | Number of concurrent active user sessions browsing and interacting on the platform. |
-| 5 | `requests_per_min` | `numeric (float)` | RPM (Throughput) | Traffic Signal | Total incoming HTTP/HTTPS request throughput processed by edge load balancers. |
-| 6 | `orders_per_min` | `numeric (float)` | Orders / Minute | Business Signal | Rate of completed transactions passing through the checkout microservice. |
-| 7 | `cpu_utilization` | `numeric (float)` | Percentage (%) | Hardware Telemetry | Average CPU core saturation across web, API, and worker cluster nodes. |
-| 8 | `memory_utilization` | `numeric (float)` | Percentage (%) | Hardware Telemetry | Average RAM saturation across application pods (contains 18 missing telemetry readings). |
-| 9 | `network_mbps` | `numeric (float)` | Megabits / sec (Mbps) | Hardware Telemetry | Aggregate network interface throughput (contains 18 missing telemetry readings). |
-| 10 | `disk_utilization` | `numeric (float)` | Percentage (%) | Hardware Telemetry | Average storage I/O and disk saturation (contains 18 missing telemetry readings). |
-| 11 | `response_time_ms` | `numeric (float)` | Milliseconds (ms) | Quality of Service (SLA) | End-to-end API response latency. The SRE hard breach threshold is **200 ms**. |
-| 12 | `current_capacity_rpm` | `numeric (float)` | RPM (Capacity) | Resource State | Maximum request handling throughput currently provisioned by active compute instances. |
-| **13** | **`next_15min_requests`** | `numeric (float)` | RPM (15-min Ahead) | **Target 1 (Regression)** | **Future ground-truth demand 15 minutes ahead**. Used to forecast upcoming traffic volume. |
-| **14** | **`scale_up_required`** | `binary (int 0/1)` | Binary Flag | **Target 2 (Classification)** | **Ground-truth operational action** (1 = Proactive scale-up recommended, 0 = Current capacity sufficient). |
+| Column Name | Data Type | Physical Unit | Operational Role | Business Description |
+| :--- | :---: | :---: | :---: | :--- |
+| `timestamp` | `datetime` | `YYYY-MM-DD HH:MM` | Temporal Anchor | Snapshot timestamp at 10-minute intervals over 21 continuous days. |
+| `sale_event` | `categorical` | `Normal / Sale / Flash Sale` | Event Context | Traffic category: Normal (52.9%), Sale (43.2%), Flash Sale (3.9%). |
+| `region` | `categorical` | `North / South / West` | Spatial Dimension | Cloud availability region handling incoming traffic (15 missing values). |
+| `active_users` | `numeric` | User Count | Demand Signal | Concurrent active visitors browsing the e-commerce platform. |
+| `requests_per_min` | `numeric` | RPM (Throughput) | Traffic Signal | Total incoming HTTP/HTTPS request throughput. |
+| `orders_per_min` | `numeric` | Orders / Minute | Business Signal | Completed checkout transactions per minute. |
+| `cpu_utilization` | `numeric (%)` | Percentage (%) | Hardware Telemetry | Average CPU core saturation across compute nodes. |
+| `memory_utilization` | `numeric (%)` | Percentage (%) | Hardware Telemetry | Average RAM saturation (18 missing telemetry readings). |
+| `network_mbps` | `numeric` | Megabits / sec (Mbps) | Hardware Telemetry | Aggregate network bandwidth throughput (18 missing readings). |
+| `disk_utilization` | `numeric (%)` | Percentage (%) | Hardware Telemetry | Average storage I/O and disk saturation (18 missing readings). |
+| `response_time_ms` | `numeric` | Milliseconds (ms) | Quality of Service | Average API latency (Critical SRE SLA limit: **200 ms**). |
+| `current_capacity_rpm` | `numeric` | RPM (Capacity) | Resource State | Maximum request throughput provisioned by current active instances. |
+| **`next_15min_requests`** | `numeric` | RPM (15-min Ahead) | **Target 1 (Regression)** | **Actual request throughput 15 minutes ahead** (Regression Target). |
+| **`scale_up_required`** | `binary (0/1)` | Binary Action Flag | **Target 2 (Classification)**| **1 = Proactive scale-up recommended, 0 = Capacity sufficient**. |
 
 ---
 
-## 3. End-to-End System Architecture & Relationship Model
+## 3. End-to-End System Architecture
 
-The system translates raw telemetry into proactive capacity decisions through a layered machine learning pipeline:
-
-```mermaid
-flowchart TD
-    subgraph S1["1. INGESTION & SENSING LAYER"]
-        A1["User Concurrency & Traffic Stream"] --> B1["API Gateways & Regional Load Balancers\n(North / South / West)"]
-        B1 --> C1["Raw Infrastructure Telemetry Stream\n(10-Minute Snapshot Frequency)"]
-    end
-
-    subgraph S2["2. FEATURE ENGINEERING & SRE DOMAIN SIGNALS"]
-        C1 --> D1["Demand Pressure:\nrequests_per_user"]
-        C1 --> D2["Checkout Conversion:\norders_to_requests_ratio"]
-        C1 --> D3["Capacity Headroom:\ncurrent_capacity_rpm - requests_per_min"]
-        C1 --> D4["Composite Utilization Pressure:\nMean(CPU, RAM, Disk)"]
-        C1 --> D5["Temporal Signals:\nhour_of_day, day_of_week, is_weekend"]
-    end
-
-    subgraph S3["3. MACHINE LEARNING INTELLIGENCE CORE"]
-        D1 & D2 & D3 & D4 & D5 --> E1["DEMAND FORECASTING (REGRESSION)\n• Linear Regression Pipeline\n• Forecasts RPM 15 Mins Ahead\n• MAE: 2,030 RPM | R²: 0.9189"]
-        D1 & D2 & D3 & D4 & D5 --> E2["PROACTIVE DECISIONING (CLASSIFICATION)\n• Random Forest Classifier\n• Triggers Proactive Scale-Up Action\n• Recall: 93.28% | F1: 0.9525"]
-        D1 & D2 & D3 & D4 & D5 --> E3["STATE DISCOVERY (CLUSTERING & PCA)\n• K-Means (K=3) & Hierarchical Dendrogram\n• Operating States: Normal, Promo, Flash\n• 2D PCA Variance: 73.57%"]
-    end
-
-    subgraph S4["4. PROACTIVE SRE ACTION ENGINE"]
-        E1 & E2 & E3 --> F1["Automated Early Warning Trigger:\nIF RF_Prob >= 0.65 OR Headroom < 20%\n--> Pre-warm Compute Clusters (T-15 min)"]
-        F1 --> G1["Zero Downtime | ₹40L GMV Protected | Latency < 200ms"]
-    end
+```
+                                  [ Production Telemetry Stream ]
+                             3,023 snapshots | 10-min cadence | July 1–21
+                                                  │
+                ┌─────────────────────────────────┴─────────────────────────────────┐
+                ▼                                                                   ▼
+    [ Supervised Intelligence ]                                         [ Unsupervised Discovery ]
+    1. Demand Forecasting (Regression)                                  1. K-Means Clustering (K=3)
+       • Linear Regression with Standard Scaling                           • Low-Traffic Steady State (52.9%)
+       • MAE: 2,030 RPM | R²: 0.9189 | MAPE: 6.67%                         • Elevated Sale Ramp-Up (43.2%)
+    2. Proactive Decisioning (Classification)                              • Critical Flash Surge (3.9%)
+       • Random Forest vs Decision Tree                                 2. Hierarchical Dendrogram (Ward Linkage)
+       • RF Recall: 93.28% | F1: 0.9525 | Precision: 97.30%             3. DBSCAN & PCA 2D Projections
+                └─────────────────────────────────┬─────────────────────────────────┘
+                                                  ▼
+                               [ SRE 2 AM Operational Runbook ]
+                     Pre-warming: T-15 min | Headroom Alert: <20% | Scale Trigger: Prob >= 0.65
 ```
 
 ---
 
-## 4. Methodological Ground Rules & Leakage Prevention
+## 4. Dataset Distributions & Exploratory Data Analysis
 
-To ensure this capstone mirrors real-world production constraints:
-1. **Strict Chronological Splitting**: First 80% of timeline (July 1 – July 17, 2,418 snapshots) for training; final 20% (July 17 – July 21, 605 snapshots) for evaluation. Random shuffling across time was strictly prohibited.
-2. **Train-Only Preprocessing**: All transformations (imputers, one-hot encoders, standard scalers) were fitted exclusively on historical training data before transforming test partitions.
-3. **Zero Target Leakage**: Neither `next_15min_requests` nor `scale_up_required` was used as a feature for any model or unsupervised algorithm.
-4. **Data Authenticity**: The dataset is processed as-is with zero manual fabrication or deletion of operational records.
+### 📊 Dataset Distributions & Operational Demand Patterns
 
----
+![Task 1: EDA Distributions & Targets](outputs/01_eda_and_targets.png)
 
-## 5. Dependencies & Setup Instructions
-
-### Prerequisites
-- Python 3.9+ (Python 3.10 / 3.11 / 3.12 recommended)
-- Jupyter Notebook / JupyterLab
-
-### Installation Steps
-
-1. **Clone the Repository**:
-```bash
-git clone https://github.com/rupali-chauksey/ecommerce-infrastructure-scaling.git
-cd ecommerce-infrastructure-scaling
-```
-
-2. **Create and Activate Virtual Environment**:
-```bash
-python -m venv venv
-# On Windows:
-.\venv\Scripts\activate
-# On Linux/macOS:
-source venv/bin/activate
-```
-
-3. **Install Dependencies**:
-```bash
-pip install -r requirements.txt
-```
+- **Demand Distribution**: Upcoming demand (`next_15min_requests`) spans from 13,019 RPM to 76,787 RPM, with a mean baseline of **31,256 RPM** and significant right-skew during flash sales.
+- **Scale-Up Target Ratio**: **96.06%** of snapshots are classified as requiring scale-up attention (`scale_up_required = 1`) due to tight default capacity buffers, highlighting critical class imbalance.
+- **Event Breakdown**: Normal operating days account for 52.9% (1,600 snapshots), planned promotional Sales 43.2% (1,306 snapshots), and sudden Flash Sales 3.9% (117 snapshots).
 
 ---
 
-## 6. Execution Steps
+## 5. Data Preparation & Leakage Prevention
 
-You can reproduce all results, metrics, and figures through any of the following methods:
+### ⏱️ Chronological Split & Missing Telemetry Imputation
 
-### Option A: Run Jupyter Notebook (Interactive)
-```bash
-jupyter notebook ecommerce_infrastructure_scaling_analysis.ipynb
-```
-Select **Kernel -> Restart & Run All** to execute all cells top-to-bottom.
+![Task 2: Chronological Split & Imputation](outputs/02_preprocessing_and_split.png)
 
-### Option B: Run Standalone Python Pipeline
-```bash
-python run_analysis.py
-```
-
-### Option C: Re-generate Visualizations & Notebook
-```bash
-python generate_plots.py
-python generate_extra_plots.py
-python generate_notebook.py
-```
+- **Chronological Split**: Applied an 80/20 time-aware split (Train: 2,418 records from July 1–17; Evaluation: 605 records from July 17–21) without random shuffling to prevent temporal data leakage.
+- **Imputation Strategy**: Fitted strictly on the training partition: **Median imputation** for numerical telemetry (`memory_utilization`, `network_mbps`, `disk_utilization`) and **Mode imputation** for categorical `region`.
+- **Outlier Retention**: Telemetry spikes during Flash Sales (CPU >90%, latency >250ms) represent real-world stress conditions and were preserved so models learn emergency overload patterns.
 
 ---
 
-## 7. Detailed Task-by-Task Implementation & Visual Solutions
+## 6. Feature Engineering & Selection
+
+### 🔍 Operational Signals & Feature Correlation
+
+![Task 3: Feature Correlation Matrix](outputs/03_feature_correlation.png)
+
+- **Engineered Domain Signals**:
+  - `requests_per_user`: Measures traffic intensity per active visitor ($\text{requests\_per\_min} / \text{active\_users}$).
+  - `orders_to_requests_ratio`: Monitors checkout conversion density and payment gateway friction.
+  - `capacity_headroom`: Quantifies remaining throughput buffer ($\text{current\_capacity\_rpm} - \text{requests\_per\_min}$).
+  - `utilization_pressure`: Composite hardware saturation index across CPU, RAM, and Disk.
+- **Zero Target Leakage**: Confirmed that neither target variable exists in the predictor matrix.
 
 ---
 
-### Task 1: Understand and Validate the Monitoring Data
+## 7. Demand Forecasting (Regression)
 
-#### Implementation Summary:
-- **Dataset Dimensions**: 3,023 monitoring snapshots $\times$ 14 columns sampled at 10-minute intervals over 21 continuous days (July 1, 2026, 00:00:00 to July 21, 2026, 23:40:00).
-- **Traffic Regimes**: `Normal` (1,600 snapshots, 52.9%), `Sale` (1,306 snapshots, 43.2%), and `Flash Sale` (117 snapshots, 3.9%).
-- **Regional Breakdown**: North (1,081), South (980), West (947), with 15 missing records.
-- **Target Analysis**:
-  - `next_15min_requests`: Continuous distribution ranging from 13,019 to 76,787 RPM (Mean: ~31,256 RPM, Std: ~9,802 RPM).
-  - `scale_up_required`: Severe class imbalance with ~96.06% positive class (1) and ~3.94% negative class (0).
-- **Data Integrity**: Verified that no rows were dropped, fabricated, or arbitrarily altered.
+### 📈 15-Minute Forward Demand Predictions
 
-#### Visual Evidence:
-![Task 1: EDA Distributions & Targets](outputs/00_eda_distributions_and_targets.png)
+![Task 4: Demand Forecasting Regression](outputs/04_demand_forecasting.png)
+
+- **Model Performance**: Multi-variable Linear Regression achieves an **MAE of 2,030.47 RPM** (~6.67% MAPE) and an **$R^2$ score of 0.9189**, explaining over 91.8% of demand variance.
+- **Evaluation Overlay**: The forecasted trajectory closely mirrors actual traffic spikes on the unseen evaluation partition, providing dependable lookahead visibility for automated scaling.
 
 ---
 
-### Task 2: Prepare the Data for Machine Learning
+## 8. Proactive Scale-Up Decisioning (Classification)
 
-#### Implementation Summary:
-- **Temporal Feature Extraction**: Extracted `hour_of_day` (0–23), `day_of_week` (0–6), and `is_weekend` (0/1) from `timestamp`.
-- **Chronological Split**: Enforced an 80/20 chronological partition (First 80% Train: 2,418 records from July 1 to July 17; Final 20% Evaluation: 605 records from July 17 to July 21). Random shuffling was strictly avoided to prevent temporal leakage.
-- **Imputation Strategy**: Fitted strictly on the training partition: **Median imputation** for numerical telemetry metrics (`memory_utilization`, `network_mbps`, `disk_utilization`) to prevent flash sale skew, and **Mode imputation** for categorical `region`.
-- **Outlier Treatment Justification**: Telemetry surges during flash sales (CPU >90%, latency >250ms) represent real-world stress conditions. Deleting or clipping them would blind the ML models to the exact emergency states they are built to detect.
+### 🎯 Classifier Comparison & Feature Importance
 
-#### Visual Evidence:
-![Task 2: Chronological Train-Test Split & Imputation](outputs/00_task2_outliers_and_temporal_split.png)
+![Task 5: Proactive Scale-Up Classification](outputs/05_proactive_classification.png)
 
----
-
-### Task 3: Engineer and Select Useful Features
-
-#### Implementation Summary:
-Four high-value domain features were engineered from current-state metrics:
-1. **Demand Pressure (`requests_per_user`)**: Measures concurrency intensity ($\text{requests\_per\_min} / \text{active\_users}$).
-2. **Checkout Conversion Density (`orders_to_requests_ratio`)**: Tracks checkout transaction strain ($\text{orders\_per\_min} / \text{requests\_per\_min}$).
-3. **Capacity Headroom (`capacity_headroom`)**: Absolute RPM buffer before hardware saturation ($\text{current\_capacity\_rpm} - \text{requests\_per\_min}$).
-4. **Utilization Pressure (`utilization_pressure`)**: Composite hardware saturation index across CPU, Memory, and Disk.
-- **Leakage Audit**: Confirmed zero target leakage; neither target exists in the feature matrix.
-
-#### Visual Evidence:
-![Task 3: Feature Correlation Matrix](outputs/01_correlation_heatmap.png)
+- **Cost Tradeoff**: In SRE, a **False Negative (missed scale-up)** leads to severe outage (₹40L GMV loss), whereas a **False Positive** costs only minor temporary cloud compute ($20–$50). Therefore, **Recall on Class 1** is the primary metric.
+- **Model Comparison**:
+  - **Decision Tree**: Accuracy = 84.13%, Recall = 85.00%, F1 = 91.13% (87 False Negatives).
+  - **Random Forest (Recommended)**: Accuracy = **91.07%**, Precision = **97.30%**, Recall = **93.28%**, F1 = **95.25%** (**cuts False Negatives down to 39**).
+- **Key Decision Drivers**: Capacity headroom, active users, and composite utilization pressure are the top predictors for scale-up triggers.
 
 ---
 
-### Task 4: Predict Upcoming E-Commerce Demand (Regression)
+## 9. Traffic & Infrastructure State Discovery (Clustering)
 
-#### Implementation Summary:
-- **Model**: Linear Regression fitted on standardized features from the chronological training partition.
-- **Evaluation Metrics on Test Partition (605 snapshots)**:
-  - **MAE**: **2,030.47 RPM** (Average deviation of ~2,000 RPM)
-  - **RMSE**: **2,644.16 RPM**
-  - **$R^2$ Score**: **0.9189** (Explains 91.89% of demand variance)
-  - **MAPE**: **6.67%**
-- **Operational Takeaway**: The model reliably captures upcoming demand trajectories, giving the SRE team a dependable 15-minute forward-looking signal.
+### 🌐 Latent Operational States & Hierarchy
 
-#### Visual Evidence:
-![Task 4: Demand Forecast Time Series Overlay](outputs/02_demand_forecast_timeseries.png)
-![Task 4: Actual vs Predicted Demand Scatter](outputs/03_demand_regression_scatter.png)
+![Task 6: Infrastructure Clustering](outputs/06_infrastructure_clustering.png)
+
+- **K-Means Clustering ($K=3$)**:
+  - **Cluster 0 (Steady-State Normal)**: Baseline load (~16k RPM), CPU <45%, latency <40ms, healthy headroom buffer.
+  - **Cluster 1 (Elevated Sale Ramp-Up)**: Promotional load (~28k RPM), CPU ~65%, latency ~75ms, scaling readiness active.
+  - **Cluster 2 (Critical Flash Surge)**: Flash spike (>50k RPM), CPU >85%, latency >200ms SLA breach, immediate scale-up required.
+- **Hierarchical & DBSCAN Insights**: Ward linkage dendrogram confirms 3 natural operational tiers. DBSCAN isolates 32 extreme surge points (1.06%) as anomalous noise requiring urgent paging.
 
 ---
 
-### Task 5: Predict Whether Proactive Scale-Up Is Required (Classification)
+## 10. Dimensionality Reduction & SLA Stress Analysis
 
-#### Implementation Summary:
-- **Models**: `DecisionTreeClassifier` vs `RandomForestClassifier` trained with `class_weight='balanced'`.
-- **Operational Cost Analysis**:
-  - **False Negative (Missed Scale-Up)**: Severe incident risk $\to$ latency >200ms, checkout stalls, ₹40L GMV loss.
-  - **False Positive (Unnecessary Scale-Up)**: Negligible cost $\to$ temporary cloud instance allocation ($20–$50).
-  - **Decision Metric**: **Recall on Class 1** is prioritized over pure accuracy.
+### 🗺️ PCA 2D Landscape & Latency Thresholds
 
-| Model | Accuracy | Precision (Class 1) | Recall (Class 1) | F1-Score (Class 1) | False Negatives |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| **Decision Tree** | 84.13% | **98.21%** | 85.00% | 91.13% | 87 |
-| **Random Forest (Recommended)** | **91.07%** | 97.30% | **93.28%** | **95.25%** | **39** |
+![Task 7: PCA and Capacity States](outputs/07_pca_and_capacity_states.png)
 
-#### Visual Evidence:
-![Task 5: Confusion Matrix Comparison](outputs/04_classification_confusion_matrices.png)
-![Task 5: Random Forest Feature Importance](outputs/05_rf_feature_importance.png)
+- **Variance Explained**: 2 Principal Components capture **73.57% of total variance** (PC1: 65.16%, PC2: 8.41%), cleanly separating healthy operational zones from critical flash surge zones.
+- **SLA Boundary**: Latency spikes steeply past the 200ms SLA when throughput exceeds 45,000 RPM and capacity headroom drops below 20%.
 
 ---
 
-### Task 6: Discover Traffic and Infrastructure States (Clustering)
-
-#### Implementation Summary:
-- **Unsupervised Matrix**: 12 current-state operational features (scaled, targets strictly excluded).
-- **K-Means Optimization**: Evaluated $K \in [2, 8]$ using Elbow Method (Inertia) and Silhouette Scores. $K=3$ identified as the optimal operational cluster count.
-- **Cluster Profiles**:
-  1. *Cluster 0 (Steady-State Normal)*: Baseline load (~16k RPM), CPU <45%, latency <40ms, ample headroom.
-  2. *Cluster 1 (Elevated Sale Ramp-Up)*: Promotional load (~28k RPM), CPU ~65%, latency ~75ms.
-  3. *Cluster 2 (Critical Flash Surge)*: Peak surge (>50k RPM), CPU >85%, latency >200ms, headroom depleted.
-- **DBSCAN**: Grouped normal operations into 2 dense clusters and flagged 32 extreme surge points (1.06%) as noise (`-1`), proving its utility as an anomaly detector.
-
-#### Visual Evidence:
-![Task 6: K-Means Elbow and Silhouette Analysis](outputs/06_kmeans_elbow_silhouette.png)
-![Task 6: Hierarchical Clustering Dendrogram](outputs/07_hierarchical_dendrogram.png)
-
----
-
-### Task 7: Reduce Dimensions and Visualize Results
-
-#### Implementation Summary:
-- **PCA Dimensionality Reduction**: 2 Principal Components capture **73.57% of total variance** (PC1: 65.16%, PC2: 8.41%).
-- **Separability**: Visualizations clearly demonstrate distinct clustering of normal operations versus high-risk flash surge events.
-
-#### Visual Evidence:
-![Task 7: PCA 2D Operating States](outputs/08_pca_2d_clusters.png)
-![Task 7: PCA 2D Sale Events](outputs/09_pca_2d_sale_event.png)
-![Task 7: Demand vs Response Latency and Headroom](outputs/10_demand_vs_response_time.png)
-
----
-
-### Task 8: SRE Proactive Capacity Recommendation & Runbook
+## 11. SRE Capacity Runbook & Leadership Recommendation
 
 ```
 ========================================================================================
                       NIMBUSCART SRE 2 AM OPERATIONAL RUNBOOK
 ========================================================================================
 [1] MONITORING CADENCE:
-    • Telemetry Ingestion: 1-minute resolution.
-    • ML Model Inference: Rolling evaluation every 5 minutes.
+    • Ingestion: 1-minute telemetry resolution.
+    • ML Inference: Rolling evaluation every 5 minutes.
 
-[2] AUTOMATED SCALE-UP TRIGGER RULE:
+[2] PROACTIVE SCALE-UP TRIGGER RULE:
     IF (Random_Forest_Prob(scale_up_required == 1) >= 0.65)
        OR (Forecasted_Demand_RPM >= 0.80 * Current_Capacity_RPM)
        OR (Capacity_Headroom <= 0.20 * Current_Capacity_RPM):
-          --> TRIGGER IMMEDIATE PROVISIONING OF ADDITIONAL POD/NODE TIER.
+          --> TRIGGER IMMEDIATE PROVISIONING OF ADDITIONAL COMPUTE NODES.
 
-[3] DIRECT ANSWERS TO VP OF INFRASTRUCTURE:
-    • Can current infrastructure survive the next 15 minutes?
-      --> Yes under Normal traffic, but FAILS during Flash Sales without proactive scaling.
-    • Under what conditions does this answer change?
-      --> When Capacity Headroom drops below 20% or Utilization Pressure exceeds 75%.
+[3] PROMOTION PRE-WARMING TIMELINE:
+    • T-60 min: Verify database replica lag and clear stale connection pools.
+    • T-30 min: Validate baseline latency and warm application caches.
+    • T-15 min: Scale checkout and API pods to 1.5x expected capacity (5-7 min boot buffer).
+    • T-0  min: Lock deployment pipelines; switch to high-frequency alerting.
 ========================================================================================
 ```
 
 ---
 
-### Bonus Challenge: Proactive Sale Readiness Analysis
+## 12. Dependencies & How to Run
 
-1. **Pre-Sale Ramp-Up Timeline**:
-   - **T-60 Minutes**: Check cluster health, verify database replica sync.
-   - **T-30 Minutes**: Benchmark baseline latency; run model sanity checks against live morning traffic.
-   - **T-15 Minutes**: Initiate pre-warming of web and checkout pods to 1.5x baseline capacity.
-   - **T-0 Minutes**: Lock code deployments; switch dashboards to real-time 1-minute alerting cadence.
-2. **Recommended Production Telemetry Signal**:
-   - **P99 API Latency & DB Connection Pool Saturation**: Average response time can hide long-tail checkout delays; monitoring P99 latency provides early detection of database bottlenecks before cascading failures occur.
+### Installation
+```bash
+git clone https://github.com/rupali-chauksey/ecommerce-infrastructure-scaling.git
+cd ecommerce-infrastructure-scaling
+pip install -r requirements.txt
+```
+
+### Execution
+- **Run Jupyter Notebook**: `jupyter notebook ecommerce_infrastructure_scaling_analysis.ipynb`
+- **Run Python Pipeline**: `python run_analysis.py`
 
 ---
 
-## 8. Repository File Structure
+## 13. Repository Structure
 
 ```
 ecommerce-infrastructure-scaling/
 ├── data/
 │   └── ecommerce_infrastructure_scaling.csv     # Telemetry dataset (3,023 snapshots)
 ├── outputs/
-│   ├── 00_eda_distributions_and_targets.png     # Task 1: EDA distributions
-│   ├── 00_task2_outliers_and_temporal_split.png # Task 2: Split & missing values
-│   ├── 01_correlation_heatmap.png               # Task 3: Feature correlation matrix
-│   ├── 02_demand_forecast_timeseries.png        # Task 4: Time-series overlay
-│   ├── 03_demand_regression_scatter.png         # Task 4: Actual vs Predicted scatter
-│   ├── 04_classification_confusion_matrices.png # Task 5: Confusion matrices
-│   ├── 05_rf_feature_importance.png             # Task 5: Feature importance
-│   ├── 06_kmeans_elbow_silhouette.png           # Task 6: Elbow & Silhouette curves
-│   ├── 07_hierarchical_dendrogram.png           # Task 6: Hierarchical dendrogram
-│   ├── 08_pca_2d_clusters.png                   # Task 7: PCA 2D clusters
-│   ├── 09_pca_2d_sale_event.png                 # Task 7: PCA 2D sale events
-│   └── 10_demand_vs_response_time.png           # Task 7: Throughput vs Latency
-├── ecommerce_infrastructure_scaling_analysis.ipynb # Fully executed Capstone Notebook
-├── generate_plots.py                            # Primary plot generator script
-├── generate_extra_plots.py                      # Task 1 & 2 plot generator script
+│   ├── 01_eda_and_targets.png                   # Task 1: EDA distributions
+│   ├── 02_preprocessing_and_split.png           # Task 2: Split & missing values
+│   ├── 03_feature_correlation.png               # Task 3: Feature correlation matrix
+│   ├── 04_demand_forecasting.png                # Task 4: Time series & scatter
+│   ├── 05_proactive_classification.png          # Task 5: Confusion matrix & importance
+│   ├── 06_infrastructure_clustering.png         # Task 6: Elbow & Dendrogram
+│   └── 07_pca_and_capacity_states.png           # Task 7: PCA 2D & SLA latency
+├── ecommerce_infrastructure_scaling_analysis.ipynb # Executed Capstone Notebook
+├── generate_clean_plots.py                      # Clean plot generator script
 ├── generate_notebook.py                         # Notebook generator script
 ├── run_analysis.py                              # Standalone ML pipeline script
 ├── requirements.txt                             # Python dependencies
-└── README.md                                    # Executive report & SRE runbook
+└── README.md                                    # Clean executive report
 ```
 
 ---
