@@ -225,4 +225,26 @@ ecommerce-infrastructure-scaling/
 ```
 
 ---
+
+## 14. References & Documentation
+
+1. **Google Site Reliability Engineering (SRE) Framework**:
+   - Beyer, B., Jones, C., Petoff, J., & Murphy, N. R. (2016). *Site Reliability Engineering: How Google Runs Production Systems*. O'Reilly Media. [SRE Book](https://sre.google/sre-book/table-of-contents/)
+   - Chapter 18: *Software Engineering in SRE* & Chapter 21: *Handling Overload*.
+   - Google Cloud SRE Best Practices: *The Four Golden Signals (Latency, Traffic, Errors, Saturation)*.
+2. **Scikit-Learn Machine Learning Library**:
+   - Pedregosa, F. et al. (2011). *Scikit-learn: Machine Learning in Python*. Journal of Machine Learning Research (JMLR), 12, pp. 2825-2830.
+   - [Scikit-Learn Regression & Classification API Reference](https://scikit-learn.org/stable/)
+   - [Scikit-Learn Clustering & Dimensionality Reduction Guides](https://scikit-learn.org/stable/modules/clustering.html)
+3. **Pandas & NumPy Data Processing Frameworks**:
+   - McKinney, W. (2010). *Data Structures for Statistical Computing in Python*. Proceedings of the 9th Python in Science Conference, pp. 51-56.
+   - [Pandas Time Series Documentation](https://pandas.pydata.org/docs/)
+   - [NumPy Array Operations Reference](https://numpy.org/doc/stable/)
+4. **SciPy Hierarchical Clustering**:
+   - Virtanen, P. et al. (2020). *SciPy 1.0: Fundamental Algorithms for Scientific Computing in Python*. Nature Methods, 17(3), pp. 261-272.
+   - [SciPy Ward Linkage & Dendrogram Visualization API](https://docs.scipy.org/doc/scipy/reference/cluster.hierarchy.html)
+5. **Applied Machine Learning Curriculum**:
+   - Skillfyme Generative AI with Agentic AI Masters Program — *Applied Machine Learning Capstone Module*.
+
+---
 *Authored by Rupali Chauksey for NimbusCart Global SRE & Infrastructure Analytics.*
