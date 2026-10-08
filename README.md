@@ -95,9 +95,9 @@ The dataset (`data/ecommerce_infrastructure_scaling.csv`) contains **3,023 monit
 ![Task 3: Feature Correlation Matrix](outputs/03_feature_correlation.png)
 
 - **Engineered Domain Signals**:
-  - `requests_per_user`: Measures traffic intensity per active visitor ($\text{requests\_per\_min} / \text{active\_users}$).
-  - `orders_to_requests_ratio`: Monitors checkout conversion density and payment gateway friction.
-  - `capacity_headroom`: Quantifies remaining throughput buffer ($\text{current\_capacity\_rpm} - \text{requests\_per\_min}$).
+  - `requests_per_user`: Measures traffic intensity per active visitor (`requests_per_min / active_users`).
+  - `orders_to_requests_ratio`: Monitors checkout conversion density and payment gateway friction (`orders_per_min / requests_per_min`).
+  - `capacity_headroom`: Quantifies remaining throughput buffer (`current_capacity_rpm - requests_per_min`).
   - `utilization_pressure`: Composite hardware saturation index across CPU, RAM, and Disk.
 - **Zero Target Leakage**: Confirmed that neither target variable exists in the predictor matrix.
 
@@ -109,7 +109,7 @@ The dataset (`data/ecommerce_infrastructure_scaling.csv`) contains **3,023 monit
 
 ![Task 4: Demand Forecasting Regression](outputs/04_demand_forecasting.png)
 
-- **Model Performance**: Multi-variable Linear Regression achieves an **MAE of 2,030.47 RPM** (~6.67% MAPE) and an **$R^2$ score of 0.9189**, explaining over 91.8% of demand variance.
+- **Model Performance**: Multi-variable Linear Regression achieves an **MAE of 2,030.47 RPM** (~6.67% MAPE) and an **R² score of 0.9189**, explaining over 91.8% of demand variance.
 - **Evaluation Overlay**: The forecasted trajectory closely mirrors actual traffic spikes on the unseen evaluation partition, providing dependable lookahead visibility for automated scaling.
 
 ---
@@ -134,7 +134,7 @@ The dataset (`data/ecommerce_infrastructure_scaling.csv`) contains **3,023 monit
 
 ![Task 6: Infrastructure Clustering](outputs/06_infrastructure_clustering.png)
 
-- **K-Means Clustering ($K=3$)**:
+- **K-Means Clustering (K=3)**:
   - **Cluster 0 (Steady-State Normal)**: Baseline load (~16k RPM), CPU <45%, latency <40ms, healthy headroom buffer.
   - **Cluster 1 (Elevated Sale Ramp-Up)**: Promotional load (~28k RPM), CPU ~65%, latency ~75ms, scaling readiness active.
   - **Cluster 2 (Critical Flash Surge)**: Flash spike (>50k RPM), CPU >85%, latency >200ms SLA breach, immediate scale-up required.
@@ -189,8 +189,10 @@ pip install -r requirements.txt
 ```
 
 ### Execution
-- **Run Jupyter Notebook**: `jupyter notebook ecommerce_infrastructure_scaling_analysis.ipynb`
-- **Run Python Pipeline**: `python run_analysis.py`
+Open and run all cells in the Jupyter Notebook:
+```bash
+jupyter notebook ecommerce_infrastructure_scaling_analysis.ipynb
+```
 
 ---
 
@@ -209,9 +211,6 @@ ecommerce-infrastructure-scaling/
 │   ├── 06_infrastructure_clustering.png         # Task 6: Elbow & Dendrogram
 │   └── 07_pca_and_capacity_states.png           # Task 7: PCA 2D & SLA latency
 ├── ecommerce_infrastructure_scaling_analysis.ipynb # Executed Capstone Notebook
-├── generate_clean_plots.py                      # Clean plot generator script
-├── generate_notebook.py                         # Notebook generator script
-├── run_analysis.py                              # Standalone ML pipeline script
 ├── requirements.txt                             # Python dependencies
 └── README.md                                    # Clean executive report
 ```
