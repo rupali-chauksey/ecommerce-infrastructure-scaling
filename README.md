@@ -1,11 +1,20 @@
 # E-Commerce Infrastructure Scaling Intelligence
 ## Predictive Demand Forecasting & Proactive Capacity Planning for NimbusCart Global
 
-**Author / Student**: Rupali Chauksey  
-**Program**: Generative AI with Agentic AI Masters Program (Skillfyme)  
-**Module**: Applied Machine Learning Capstone Project  
-**Repository**: [github.com/rupali-chauksey/ecommerce-infrastructure-scaling](https://github.com/rupali-chauksey/ecommerce-infrastructure-scaling)  
-**Primary Deliverable**: [`ecommerce_infrastructure_scaling_analysis.ipynb`](ecommerce_infrastructure_scaling_analysis.ipynb)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
+[![Scikit-Learn 1.4+](https://img.shields.io/badge/Scikit--Learn-1.4+-orange.svg?logo=scikit-learn&logoColor=white)](https://scikit-learn.org/)
+[![Pandas 2.0+](https://img.shields.io/badge/Pandas-2.0+-150458.svg?logo=pandas&logoColor=white)](https://pandas.pydata.org/)
+[![NumPy 1.26+](https://img.shields.io/badge/NumPy-1.26+-013243.svg?logo=numpy&logoColor=white)](https://numpy.org/)
+[![SciPy Clustering](https://img.shields.io/badge/SciPy-Clustering-8CAAE6.svg?logo=scipy&logoColor=white)](https://scipy.org/)
+[![Jupyter Notebook](https://img.shields.io/badge/Jupyter-Notebook-F37626.svg?logo=jupyter&logoColor=white)](https://jupyter.org/)
+[![License MIT](https://img.shields.io/badge/License-MIT-brightgreen.svg)](https://opensource.org/licenses/MIT)
+
+- **Project**: E-Commerce Infrastructure Scaling Intelligence (End-to-End Machine Learning Pipeline)
+- **Domain**: Cloud Infrastructure & Site Reliability Engineering (NimbusCart Global)
+- **GitHub Repository**: https://github.com/rupali-chauksey/ecommerce-infrastructure-scaling
+- **Primary Notebook**: `ecommerce_infrastructure_scaling_analysis.ipynb`
+- **Dataset**: `ecommerce_infrastructure_scaling.csv`
+- **Author / Student**: Rupali Chauksey (Skillfyme Masters Program)
 
 ---
 
