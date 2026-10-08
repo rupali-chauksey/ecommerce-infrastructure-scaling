@@ -3,51 +3,106 @@
 
 **Student / Author**: Rupali Chauksey  
 **Program**: Generative AI with Agentic AI Masters Program (Skillfyme)  
-**Module**: Applied Machine Learning Capstone Project  
+**Module**: Applied Machine Learning Capstone Deliverable  
+**Client**: NimbusCart Global (Site Reliability Engineering & Infrastructure Analytics Guild)  
 **Repository**: [https://github.com/rupali-chauksey/ecommerce-infrastructure-scaling](https://github.com/rupali-chauksey/ecommerce-infrastructure-scaling)  
 **Primary Deliverable**: [`ecommerce_infrastructure_scaling_analysis.ipynb`](ecommerce_infrastructure_scaling_analysis.ipynb)
 
 ---
 
-## 1. Problem Statement Overview & Incident Context
+## 1. Executive Incident Context & Business Problem
 
-Six weeks ago, **NimbusCart Global**—a high-growth e-commerce platform operating across North, South, and West regions—suffered a catastrophic service disruption during an unannounced Flash Sale. Active users surged by over 300% in less than 30 minutes. Traditional reactive auto-scaling policies lagged behind the rapid surge, request queues built up, API response latency spiked beyond 200ms, and checkout transactions stalled. The incident resulted in **₹40 Lakh in lost Gross Merchandise Value (GMV)** and `#NimbusCartDown` trending across social media.
+Six weeks ago, **NimbusCart Global**—a fast-growing tier-1 e-commerce enterprise serving customers across North, South, and West geographical regions—suffered a high-severity infrastructure collapse during an unscheduled Flash Sale. 
 
-### The Brief from the VP of Infrastructure:
+### What Happened During the Outage?
+1. **Demand Surge**: Concurrent active users tripled (a 300% spike) in under 30 minutes.
+2. **Reactive Lag**: Traditional threshold-based auto-scaling rules had a 5–7 minute provisioning lag (container boot + JVM/Node warm-up time).
+3. **SLA Breach**: API response latency crossed the strict 200ms SLA threshold, surging past 380ms.
+4. **Checkout Throttling**: Microservices choked, database connection pools were exhausted, and payment gateways timed out.
+5. **Business Impact**: **₹40 Lakh in lost Gross Merchandise Value (GMV)** within a single evening, accompanied by `#NimbusCartDown` trending nationwide on social media.
+
+```
+                    ┌─────────────────────────────────────────────────────────┐
+                    │               THE CRITICAL OUTAGE SPIRAL                │
+                    └─────────────────────────────────────────────────────────┘
+   [Flash Sale Spike] ──> [Active Users x3] ──> [Auto-Scaling 7min Lag]
+                                                            │
+                                                            ▼
+   [₹40L Lost GMV] <── [Checkout Throttled] <── [Latency Spikes >200ms]
+```
+
+### The Mandate from the VP of Infrastructure:
 > *"I don't want another dashboard. I want to know, right now, whether the infrastructure we have will survive the next 15 minutes — and if not, how much lead time we get to scale up before it breaks. Show me the evidence, not a guess."*
 
-### Solution Objectives:
-This end-to-end Applied Machine Learning intelligence system provides proactive operational foresight across three foundational pillars:
-1. **Demand Forecasting (Regression)**: Predict incoming requests per minute (RPM) 15 minutes ahead.
-2. **Actionable Decisioning (Classification)**: Decide whether a proactive infrastructure scale-up is required right now.
-3. **Operational State Discovery (Clustering & PCA)**: Discover latent traffic regimes to identify impending capacity breakdown.
+---
+
+## 2. Telemetry Schema & Complete Data Dictionary
+
+The production telemetry dataset (`data/ecommerce_infrastructure_scaling.csv`) captures **3,023 monitoring snapshots** recorded at continuous **10-minute intervals** across 3 full weeks (July 1 to July 21, 2026).
+
+| # | Column Name | Data Type | Physical Unit | Operational Role | Business Description & SRE Meaning |
+| :---: | :--- | :---: | :---: | :---: | :--- |
+| 1 | `timestamp` | `datetime` | `YYYY-MM-DD HH:MM` | Temporal Anchor | Snapshot timestamp at 10-minute intervals covering 21 continuous days. |
+| 2 | `sale_event` | `categorical` | `Normal / Sale / Flash Sale` | Business Context | Commercial operating regime: Baseline Normal (52.9%), Planned Sale (43.2%), Unscheduled Flash Sale (3.9%). |
+| 3 | `region` | `categorical` | `North / South / West` | Spatial Dimension | Geographical infrastructure zone and AWS/GCP availability region handling the load. |
+| 4 | `active_users` | `numeric (float)` | User Count | Demand Signal | Number of concurrent active user sessions browsing and interacting on the platform. |
+| 5 | `requests_per_min` | `numeric (float)` | RPM (Throughput) | Traffic Signal | Total incoming HTTP/HTTPS request throughput processed by edge load balancers. |
+| 6 | `orders_per_min` | `numeric (float)` | Orders / Minute | Business Signal | Rate of completed transactions passing through the checkout microservice. |
+| 7 | `cpu_utilization` | `numeric (float)` | Percentage (%) | Hardware Telemetry | Average CPU core saturation across web, API, and worker cluster nodes. |
+| 8 | `memory_utilization` | `numeric (float)` | Percentage (%) | Hardware Telemetry | Average RAM saturation across application pods (contains 18 missing telemetry readings). |
+| 9 | `network_mbps` | `numeric (float)` | Megabits / sec (Mbps) | Hardware Telemetry | Aggregate network interface throughput (contains 18 missing telemetry readings). |
+| 10 | `disk_utilization` | `numeric (float)` | Percentage (%) | Hardware Telemetry | Average storage I/O and disk saturation (contains 18 missing telemetry readings). |
+| 11 | `response_time_ms` | `numeric (float)` | Milliseconds (ms) | Quality of Service (SLA) | End-to-end API response latency. The SRE hard breach threshold is **200 ms**. |
+| 12 | `current_capacity_rpm` | `numeric (float)` | RPM (Capacity) | Resource State | Maximum request handling throughput currently provisioned by active compute instances. |
+| **13** | **`next_15min_requests`** | `numeric (float)` | RPM (15-min Ahead) | **Target 1 (Regression)** | **Future ground-truth demand 15 minutes ahead**. Used to forecast upcoming traffic volume. |
+| **14** | **`scale_up_required`** | `binary (int 0/1)` | Binary Flag | **Target 2 (Classification)** | **Ground-truth operational action** (1 = Proactive scale-up recommended, 0 = Current capacity sufficient). |
 
 ---
 
-## 2. Solution Approach & Architecture
+## 3. End-to-End System Architecture & Relationship Model
 
-```
-                                  [ Production Telemetry Stream ]
-                             3,023 snapshots | 10-min cadence | July 1–21
-                                                  │
-                ┌─────────────────────────────────┴─────────────────────────────────┐
-                ▼                                                                   ▼
-    [ Supervised Intelligence ]                                         [ Unsupervised Discovery ]
-    1. Demand Forecasting (Regression)                                  1. K-Means Clustering (K=3)
-       • Linear Regression with Standard Scaling                           • Low-Traffic Steady State (52.9%)
-       • MAE: 2,030.47 RPM | R²: 0.9189 | MAPE: 6.67%                      • Elevated Sale Ramp-Up (43.2%)
-    2. Proactive Decisioning (Classification)                              • Critical Flash Surge (3.9%)
-       • Random Forest vs Decision Tree                                 2. Hierarchical Dendrogram (Ward Linkage)
-       • RF Recall: 93.28% | F1: 0.9525 | Precision: 97.30%             3. DBSCAN & PCA 2D Projections
-                └─────────────────────────────────┬─────────────────────────────────┘
-                                                  ▼
-                               [ SRE 2 AM Operational Runbook ]
-                     Pre-warming: T-15 min | Headroom Alert: <20% | Scale Trigger: Prob >= 0.65
+The system translates raw telemetry into proactive capacity decisions through a layered machine learning pipeline:
+
+```mermaid
+flowchart TD
+    subgraph S1["1. INGESTION & SENSING LAYER"]
+        A1["User Concurrency & Traffic Stream"] --> B1["API Gateways & Regional Load Balancers\n(North / South / West)"]
+        B1 --> C1["Raw Infrastructure Telemetry Stream\n(10-Minute Snapshot Frequency)"]
+    end
+
+    subgraph S2["2. FEATURE ENGINEERING & SRE DOMAIN SIGNALS"]
+        C1 --> D1["Demand Pressure:\nrequests_per_user"]
+        C1 --> D2["Checkout Conversion:\norders_to_requests_ratio"]
+        C1 --> D3["Capacity Headroom:\ncurrent_capacity_rpm - requests_per_min"]
+        C1 --> D4["Composite Utilization Pressure:\nMean(CPU, RAM, Disk)"]
+        C1 --> D5["Temporal Signals:\nhour_of_day, day_of_week, is_weekend"]
+    end
+
+    subgraph S3["3. MACHINE LEARNING INTELLIGENCE CORE"]
+        D1 & D2 & D3 & D4 & D5 --> E1["DEMAND FORECASTING (REGRESSION)\n• Linear Regression Pipeline\n• Forecasts RPM 15 Mins Ahead\n• MAE: 2,030 RPM | R²: 0.9189"]
+        D1 & D2 & D3 & D4 & D5 --> E2["PROACTIVE DECISIONING (CLASSIFICATION)\n• Random Forest Classifier\n• Triggers Proactive Scale-Up Action\n• Recall: 93.28% | F1: 0.9525"]
+        D1 & D2 & D3 & D4 & D5 --> E3["STATE DISCOVERY (CLUSTERING & PCA)\n• K-Means (K=3) & Hierarchical Dendrogram\n• Operating States: Normal, Promo, Flash\n• 2D PCA Variance: 73.57%"]
+    end
+
+    subgraph S4["4. PROACTIVE SRE ACTION ENGINE"]
+        E1 & E2 & E3 --> F1["Automated Early Warning Trigger:\nIF RF_Prob >= 0.65 OR Headroom < 20%\n--> Pre-warm Compute Clusters (T-15 min)"]
+        F1 --> G1["Zero Downtime | ₹40L GMV Protected | Latency < 200ms"]
+    end
 ```
 
 ---
 
-## 3. Dependencies & Setup Instructions
+## 4. Methodological Ground Rules & Leakage Prevention
+
+To ensure this capstone mirrors real-world production constraints:
+1. **Strict Chronological Splitting**: First 80% of timeline (July 1 – July 17, 2,418 snapshots) for training; final 20% (July 17 – July 21, 605 snapshots) for evaluation. Random shuffling across time was strictly prohibited.
+2. **Train-Only Preprocessing**: All transformations (imputers, one-hot encoders, standard scalers) were fitted exclusively on historical training data before transforming test partitions.
+3. **Zero Target Leakage**: Neither `next_15min_requests` nor `scale_up_required` was used as a feature for any model or unsupervised algorithm.
+4. **Data Authenticity**: The dataset is processed as-is with zero manual fabrication or deletion of operational records.
+
+---
+
+## 5. Dependencies & Setup Instructions
 
 ### Prerequisites
 - Python 3.9+ (Python 3.10 / 3.11 / 3.12 recommended)
@@ -61,7 +116,7 @@ git clone https://github.com/rupali-chauksey/ecommerce-infrastructure-scaling.gi
 cd ecommerce-infrastructure-scaling
 ```
 
-2. **Create and Activate Virtual Environment** (Optional but recommended):
+2. **Create and Activate Virtual Environment**:
 ```bash
 python -m venv venv
 # On Windows:
@@ -77,7 +132,7 @@ pip install -r requirements.txt
 
 ---
 
-## 4. Execution Steps
+## 6. Execution Steps
 
 You can reproduce all results, metrics, and figures through any of the following methods:
 
@@ -101,7 +156,7 @@ python generate_notebook.py
 
 ---
 
-## 5. Detailed Task-by-Task Implementation & Visual Solutions
+## 7. Detailed Task-by-Task Implementation & Visual Solutions
 
 ---
 
@@ -254,7 +309,7 @@ Four high-value domain features were engineered from current-state metrics:
 
 ---
 
-## 6. Repository File Structure
+## 8. Repository File Structure
 
 ```
 ecommerce-infrastructure-scaling/
