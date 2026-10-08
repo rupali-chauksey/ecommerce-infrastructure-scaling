@@ -203,29 +203,6 @@ Open and run all cells in the Jupyter Notebook:
 jupyter notebook ecommerce_infrastructure_scaling_analysis.ipynb
 ```
 
----
-
-## 13. Repository Structure
-
-```
-ecommerce-infrastructure-scaling/
-├── data/
-│   └── ecommerce_infrastructure_scaling.csv     # Telemetry dataset (3,023 snapshots)
-├── outputs/
-│   ├── 01_eda_and_targets.png                   # Task 1: EDA distributions
-│   ├── 02_preprocessing_and_split.png           # Task 2: Split & missing values
-│   ├── 03_feature_correlation.png               # Task 3: Feature correlation matrix
-│   ├── 04_demand_forecasting.png                # Task 4: Time series & scatter
-│   ├── 05_proactive_classification.png          # Task 5: Confusion matrix & importance
-│   ├── 06_infrastructure_clustering.png         # Task 6: Elbow & Dendrogram
-│   └── 07_pca_and_capacity_states.png           # Task 7: PCA 2D & SLA latency
-├── ecommerce_infrastructure_scaling_analysis.ipynb # Executed Capstone Notebook
-├── requirements.txt                             # Python dependencies
-└── README.md                                    # Clean executive report
-```
-
----
-
 ## 14. References & Documentation
 
 1. **Google Site Reliability Engineering (SRE) Framework**:
@@ -247,4 +224,3 @@ ecommerce-infrastructure-scaling/
    - Skillfyme Generative AI with Agentic AI Masters Program — *Applied Machine Learning Capstone Module*.
 
 ---
-*Authored by Rupali Chauksey for NimbusCart Global SRE & Infrastructure Analytics.*
